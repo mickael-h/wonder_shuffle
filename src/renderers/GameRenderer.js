@@ -101,16 +101,22 @@ export class GameRenderer {
       this.boundHandlers.onDragEnd
     );
 
-    // Touch events
+    // Touch events (passive: false to allow preventDefault)
     this.app.canvas.addEventListener(
       "touchstart",
-      this.boundHandlers.onTouchStart
+      this.boundHandlers.onTouchStart,
+      { passive: false }
     );
     this.app.canvas.addEventListener(
       "touchmove",
-      this.boundHandlers.onTouchMove
+      this.boundHandlers.onTouchMove,
+      { passive: false }
     );
-    this.app.canvas.addEventListener("touchend", this.boundHandlers.onTouchEnd);
+    this.app.canvas.addEventListener(
+      "touchend",
+      this.boundHandlers.onTouchEnd,
+      { passive: false }
+    );
 
     // Smooth scrolling with momentum
     this.app.ticker.add(this.updateScroll.bind(this));
@@ -473,6 +479,7 @@ export class GameRenderer {
       this.scrollStartX = this.scrollContainer.x;
       this.scrollVelocity = 0;
       this.isHorizontalScroll = false; // Reset scroll direction detection
+      // Don't prevent default here - wait until we know the direction
     }
   }
 
@@ -487,16 +494,24 @@ export class GameRenderer {
 
     // Determine if this is a horizontal scroll (only prevent default for horizontal)
     // Use a threshold to decide: if horizontal movement is greater than vertical, it's horizontal scroll
+    // Use a minimum threshold (10px) to avoid false positives on slight movements
     if (!this.isHorizontalScroll) {
-      this.isHorizontalScroll = Math.abs(deltaX) > Math.abs(deltaY);
+      const absDeltaX = Math.abs(deltaX);
+      const absDeltaY = Math.abs(deltaY);
+      // If horizontal movement is greater than vertical AND exceeds threshold
+      this.isHorizontalScroll = absDeltaX > absDeltaY && absDeltaX > 10;
     }
 
     // Only prevent default and handle drag if it's a horizontal scroll
     // This allows vertical scrolling (page scroll) to work normally
     if (this.isHorizontalScroll) {
       event.preventDefault();
+      event.stopPropagation(); // Prevent event from bubbling
       this.scrollContainer.x = this.scrollStartX + deltaX;
       this.constrainScroll();
+    } else if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 10) {
+      // If it's clearly vertical, allow page scroll by not preventing default
+      // This ensures vertical page scrolling still works
     }
   }
 

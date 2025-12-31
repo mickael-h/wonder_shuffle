@@ -69,8 +69,12 @@ body {
 
 #canvas-container canvas {
   display: block;
-  /* Allow touch events to be handled by parent */
-  touch-action: pan-y pinch-zoom;
+  pointer-events: auto; /* Ensure canvas receives touch events */
+  /* touch-action: none allows us to handle all touch events in JS */
+  touch-action: none; /* Handle all touch events in JavaScript for better control */
+  -webkit-touch-callout: none; /* Disable iOS callout menu */
+  -webkit-user-select: none; /* Disable text selection */
+  user-select: none;
 }
 
 #effects-display {
