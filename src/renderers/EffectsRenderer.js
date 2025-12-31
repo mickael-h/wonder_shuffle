@@ -234,7 +234,9 @@ export class EffectsRenderer {
       durations.forEach((d12Count, damageType) => {
         const durationItem = document.createElement("div");
         durationItem.className = "chaos-duration-item";
-        durationItem.textContent = `${capitalizeFirst(damageType)}: ${d12Count}d12 days`;
+        const diceNotation =
+          d12Count === 1 ? `${d12Count}d12` : `${d12Count}d12kh1`;
+        durationItem.textContent = `${capitalizeFirst(damageType)}: ${diceNotation} days`;
         durationsContainer.appendChild(durationItem);
       });
 
@@ -311,7 +313,9 @@ export class EffectsRenderer {
       durations.forEach((d12Count, damageType) => {
         const durationItem = document.createElement("div");
         durationItem.className = "chaos-duration-item";
-        durationItem.textContent = `${capitalizeFirst(damageType)}: ${d12Count}d12 days`;
+        const diceNotation =
+          d12Count === 1 ? `${d12Count}d12` : `${d12Count}d12kh1`;
+        durationItem.textContent = `${capitalizeFirst(damageType)}: ${diceNotation} days`;
         durationsContainer.appendChild(durationItem);
       });
 
@@ -468,12 +472,13 @@ export class EffectsRenderer {
       descriptionElement.textContent = rolledText;
     });
 
-    // Also handle Chaos and Order duration items
+    // Also handle Chaos and Order duration items (kh1 notation uses max automatically)
     const durationItems = this.effectsList.querySelectorAll(
       ".chaos-duration-item"
     );
     durationItems.forEach((durationElement) => {
       const originalText = durationElement.textContent;
+      // Pattern matches "Xd12kh1" notation for durations (using general dice pattern)
       const rolledText = rollDiceInText(originalText);
       durationElement.textContent = rolledText;
     });
