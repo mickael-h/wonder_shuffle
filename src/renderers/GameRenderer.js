@@ -26,12 +26,10 @@ export class GameRenderer {
     this.scrollContainer = null;
     this.isDragging = false;
     this.dragStartX = 0;
-    this.dragStartY = 0; // Track Y position to detect vertical vs horizontal scrolling
     this.scrollStartX = 0;
     this.scrollVelocity = 0;
     this.lastScrollTime = 0;
     this.lastScrollX = 0;
-    this.isHorizontalScroll = false; // Track if user is scrolling horizontally
 
     // Cursor tracking for card rotation and hover
     this.cursorX = 0;
@@ -101,22 +99,16 @@ export class GameRenderer {
       this.boundHandlers.onDragEnd
     );
 
-    // Touch events (passive: false to allow preventDefault)
+    // Touch events
     this.app.canvas.addEventListener(
       "touchstart",
-      this.boundHandlers.onTouchStart,
-      { passive: false }
+      this.boundHandlers.onTouchStart
     );
     this.app.canvas.addEventListener(
       "touchmove",
-      this.boundHandlers.onTouchMove,
-      { passive: false }
+      this.boundHandlers.onTouchMove
     );
-    this.app.canvas.addEventListener(
-      "touchend",
-      this.boundHandlers.onTouchEnd,
-      { passive: false }
-    );
+    this.app.canvas.addEventListener("touchend", this.boundHandlers.onTouchEnd);
 
     // Smooth scrolling with momentum
     this.app.ticker.add(this.updateScroll.bind(this));
@@ -172,8 +164,7 @@ export class GameRenderer {
     });
 
     // If cursor is outside canvas, reset all cards
-    // Skip cursor tracking on touch devices to avoid conflicts with touch events
-    if (this.cursorX < 0 || this.cursorY < 0 || "ontouchstart" in window) {
+    if (this.cursorX < 0 || this.cursorY < 0) {
       this.cardSprites.forEach((cardContainer) => {
         this.resetCardToOriginal(cardContainer);
       });
@@ -417,10 +408,8 @@ export class GameRenderer {
   onDragStart(event) {
     this.isDragging = true;
     this.dragStartX = event.clientX;
-    this.dragStartY = event.clientY;
     this.scrollStartX = this.scrollContainer.x;
     this.scrollVelocity = 0;
-    this.isHorizontalScroll = false; // Reset scroll direction detection
   }
 
   /**
@@ -428,22 +417,11 @@ export class GameRenderer {
    */
   onDragMove(event) {
     if (!this.isDragging) return;
+    event.preventDefault();
 
     const deltaX = event.clientX - this.dragStartX;
-    const deltaY = event.clientY - this.dragStartY;
-
-    // Determine if this is a horizontal scroll (only prevent default for horizontal)
-    // Use a threshold to decide: if horizontal movement is greater than vertical, it's horizontal scroll
-    if (!this.isHorizontalScroll) {
-      this.isHorizontalScroll = Math.abs(deltaX) > Math.abs(deltaY);
-    }
-
-    // Only prevent default and handle drag if it's a horizontal scroll
-    if (this.isHorizontalScroll) {
-      event.preventDefault();
-      this.scrollContainer.x = this.scrollStartX + deltaX;
-      this.constrainScroll();
-    }
+    this.scrollContainer.x = this.scrollStartX + deltaX;
+    this.constrainScroll();
   }
 
   /**
@@ -451,20 +429,14 @@ export class GameRenderer {
    */
   onDragEnd(_event) {
     if (!this.isDragging) return;
-    const wasHorizontalScroll = this.isHorizontalScroll;
     this.isDragging = false;
-    this.isHorizontalScroll = false; // Reset scroll direction
 
-    // Only calculate velocity if we were actually dragging horizontally
-    if (wasHorizontalScroll) {
-      const now = Date.now();
-      const deltaTime = now - this.lastScrollTime;
-      if (deltaTime > 0) {
-        const deltaX = this.scrollContainer.x - this.lastScrollX;
-        this.scrollVelocity = (deltaX / deltaTime) * 16; // Normalize to 60fps
-      }
-    } else {
-      this.scrollVelocity = 0;
+    // Calculate velocity for momentum scrolling
+    const now = Date.now();
+    const deltaTime = now - this.lastScrollTime;
+    if (deltaTime > 0) {
+      const deltaX = this.scrollContainer.x - this.lastScrollX;
+      this.scrollVelocity = (deltaX / deltaTime) * 16; // Normalize to 60fps
     }
   }
 
@@ -475,11 +447,8 @@ export class GameRenderer {
     if (event.touches.length === 1) {
       this.isDragging = true;
       this.dragStartX = event.touches[0].clientX;
-      this.dragStartY = event.touches[0].clientY;
       this.scrollStartX = this.scrollContainer.x;
       this.scrollVelocity = 0;
-      this.isHorizontalScroll = false; // Reset scroll direction detection
-      // Don't prevent default here - wait until we know the direction
     }
   }
 
@@ -488,31 +457,11 @@ export class GameRenderer {
    */
   onTouchMove(event) {
     if (!this.isDragging || event.touches.length !== 1) return;
+    event.preventDefault();
 
     const deltaX = event.touches[0].clientX - this.dragStartX;
-    const deltaY = event.touches[0].clientY - this.dragStartY;
-
-    // Determine if this is a horizontal scroll (only prevent default for horizontal)
-    // Use a threshold to decide: if horizontal movement is greater than vertical, it's horizontal scroll
-    // Use a minimum threshold (10px) to avoid false positives on slight movements
-    if (!this.isHorizontalScroll) {
-      const absDeltaX = Math.abs(deltaX);
-      const absDeltaY = Math.abs(deltaY);
-      // If horizontal movement is greater than vertical AND exceeds threshold
-      this.isHorizontalScroll = absDeltaX > absDeltaY && absDeltaX > 10;
-    }
-
-    // Only prevent default and handle drag if it's a horizontal scroll
-    // This allows vertical scrolling (page scroll) to work normally
-    if (this.isHorizontalScroll) {
-      event.preventDefault();
-      event.stopPropagation(); // Prevent event from bubbling
-      this.scrollContainer.x = this.scrollStartX + deltaX;
-      this.constrainScroll();
-    } else if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 10) {
-      // If it's clearly vertical, allow page scroll by not preventing default
-      // This ensures vertical page scrolling still works
-    }
+    this.scrollContainer.x = this.scrollStartX + deltaX;
+    this.constrainScroll();
   }
 
   /**
@@ -520,20 +469,14 @@ export class GameRenderer {
    */
   onTouchEnd(_event) {
     if (!this.isDragging) return;
-    const wasHorizontalScroll = this.isHorizontalScroll;
     this.isDragging = false;
-    this.isHorizontalScroll = false; // Reset scroll direction
 
-    // Only calculate velocity if we were actually dragging horizontally
-    if (wasHorizontalScroll) {
-      const now = Date.now();
-      const deltaTime = now - this.lastScrollTime;
-      if (deltaTime > 0) {
-        const deltaX = this.scrollContainer.x - this.lastScrollX;
-        this.scrollVelocity = (deltaX / deltaTime) * 16;
-      }
-    } else {
-      this.scrollVelocity = 0;
+    // Calculate velocity for momentum scrolling
+    const now = Date.now();
+    const deltaTime = now - this.lastScrollTime;
+    if (deltaTime > 0) {
+      const deltaX = this.scrollContainer.x - this.lastScrollX;
+      this.scrollVelocity = (deltaX / deltaTime) * 16;
     }
   }
 
@@ -551,14 +494,11 @@ export class GameRenderer {
       this.lastScrollTime = now;
     }
 
-    // Apply momentum scrolling (only if we were dragging horizontally)
+    // Apply momentum scrolling
     if (!this.isDragging && Math.abs(this.scrollVelocity) > 0.1) {
       this.scrollContainer.x += this.scrollVelocity;
       this.scrollVelocity *= 0.95; // Friction
       this.constrainScroll();
-    } else if (!this.isDragging) {
-      // Reset velocity if we're not dragging anymore
-      this.scrollVelocity = 0;
     }
   }
 

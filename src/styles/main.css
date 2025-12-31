@@ -63,18 +63,10 @@ body {
   overflow: hidden;
   width: 100%;
   min-height: 200px; /* Minimum height, will grow dynamically based on card count */
-  /* Allow touch events to pass through for vertical scrolling when not dragging horizontally */
-  touch-action: pan-y pinch-zoom;
 }
 
 #canvas-container canvas {
   display: block;
-  pointer-events: auto; /* Ensure canvas receives touch events */
-  /* touch-action: none allows us to handle all touch events in JS */
-  touch-action: none; /* Handle all touch events in JavaScript for better control */
-  -webkit-touch-callout: none; /* Disable iOS callout menu */
-  -webkit-user-select: none; /* Disable text selection */
-  user-select: none;
 }
 
 #effects-display {
