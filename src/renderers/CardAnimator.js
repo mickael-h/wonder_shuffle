@@ -173,6 +173,9 @@ export class CardAnimator {
     const startTime = Date.now();
     const duration = ANIMATION_CONFIG.DURATION;
 
+    // Mark card as currently animating to prevent hover manager interference
+    container._isAnimating = true;
+
     const animate = () => {
       const elapsed = Date.now() - startTime;
       const progress = Math.min(elapsed / duration, 1);
@@ -230,6 +233,10 @@ export class CardAnimator {
         backContainer.visible = false;
         frontContainer.visible = true;
         glitterContainer.visible = false;
+
+        // Mark animation as complete so hover manager can safely use original positions
+        container._animationComplete = true;
+        container._isAnimating = false; // Animation finished, allow hover manager to interact
 
         // Start hover animation after flip animation completes
         this.startHoverAnimation(container);
