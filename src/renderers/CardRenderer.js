@@ -67,7 +67,7 @@ export class CardRenderer {
     }
 
     try {
-      const imagePath = `/src/assets/images/${cardName}.png`;
+      const imagePath = `/assets/images/${cardName}.png`;
       const texture = await Assets.load(imagePath);
       
       // Cache the texture for future use
