@@ -21,7 +21,6 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@dice-roller/rpg-dice-roller": "^5.5.1",
     "pixi.js": "^8.14.3",
     "pure-rand": "^7.0.1"
   },

@@ -83,8 +83,33 @@
 
       #effects-display h2 {
         font-size: 18px;
+        margin: 0;
         margin-bottom: 15px;
         color: #ffffff;
+        display: inline-block;
+      }
+
+      #roll-dice-button {
+        margin-left: 12px;
+        padding: 6px 12px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+        transition:
+          transform 0.2s,
+          box-shadow 0.2s;
+      }
+
+      #roll-dice-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      }
+
+      #roll-dice-button:active {
+        transform: translateY(0);
       }
 
       .effect-item {
@@ -331,7 +356,7 @@
   <body>
     <div id="game-container">
       <h1 style="text-align: center; margin-bottom: 20px; color: #ffffff">
-        Wonder Shuffle
+        Deck of Wonder Simulator
       </h1>
       <div id="controls">
         <div class="input-group">
@@ -359,6 +384,7 @@
       <div id="canvas-container"></div>
       <div id="effects-display" class="empty">
         <h2>Effects</h2>
+        <button id="roll-dice-button">Roll Dice</button>
         <div id="effects-list"></div>
       </div>
     </div>
