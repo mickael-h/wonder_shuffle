@@ -1,4 +1,6 @@
 import { Graphics, Container } from "pixi.js";
+import { random } from "../utils/rng.js";
+import { ANIMATION_CONSTANTS } from "../constants.js";
 
 /**
  * Animation configuration
@@ -82,10 +84,10 @@ export class CardAnimator {
     const glitters = [];
     for (let i = 0; i < ANIMATION_CONFIG.GLITTER_COUNT; i++) {
       const glitter = new Graphics();
-      const baseSize = Math.random() * 6 + 3;
+      const baseSize = random() * 6 + 3;
       const color =
         ANIMATION_CONFIG.GLITTER_COLORS[
-          Math.floor(Math.random() * ANIMATION_CONFIG.GLITTER_COLORS.length)
+          Math.floor(random() * ANIMATION_CONFIG.GLITTER_COLORS.length)
         ];
 
       // Draw star shape with gradient glow layers (all drawn in drawStar)
@@ -95,7 +97,7 @@ export class CardAnimator {
 
       // Random position around center
       const angle = (Math.PI * 2 * i) / ANIMATION_CONFIG.GLITTER_COUNT;
-      const distance = Math.random() * 100 + 50;
+      const distance = random() * 100 + 50;
       glitter.x = Math.cos(angle) * distance;
       glitter.y = Math.sin(angle) * distance;
 
@@ -239,19 +241,29 @@ export class CardAnimator {
 
   /**
    * Starts a subtle hover animation for the card (up and down motion)
+   * Stores animation ID on container so it can be stopped later
    * @param {Container} container - Card container to animate
+   * @param {number} baseY - Optional base Y position (uses container.y if not provided)
    */
-  static startHoverAnimation(container) {
-    const hoverIntensity = 5; // pixels
-    const baseY = container.y;
+  static startHoverAnimation(container, baseY = null) {
+    // Stop any existing hover animation on this container
+    this.stopHoverAnimation(container);
 
-    // Random duration between 4-5 seconds (in milliseconds)
-    const duration = 4000 + Math.random() * 1000;
+    const hoverIntensity = ANIMATION_CONSTANTS.HOVER_INTENSITY;
+    const animationBaseY = baseY !== null ? baseY : container.y;
+
+    // Random duration between min and max (in milliseconds)
+    const duration =
+      ANIMATION_CONSTANTS.HOVER_DURATION_MIN +
+      random() *
+        (ANIMATION_CONSTANTS.HOVER_DURATION_MAX -
+          ANIMATION_CONSTANTS.HOVER_DURATION_MIN);
 
     // Random phase offset for variety (0 to 2π)
-    const phaseOffset = Math.random() * Math.PI * 2;
+    const phaseOffset = random() * Math.PI * 2;
 
     const startTime = Date.now();
+    let animationFrameId = null;
 
     const animate = () => {
       const elapsed = Date.now() - startTime;
@@ -263,11 +275,26 @@ export class CardAnimator {
 
       // Calculate Y offset with sine wave (smooth easing at extremes)
       const yOffset = sineValue * hoverIntensity;
-      container.y = baseY + yOffset;
+      container.y = animationBaseY + yOffset;
 
-      requestAnimationFrame(animate);
+      animationFrameId = requestAnimationFrame(animate);
+      // Store animation ID on container for cleanup
+      container._hoverAnimationId = animationFrameId;
     };
 
-    animate();
+    animationFrameId = requestAnimationFrame(animate);
+    container._hoverAnimationId = animationFrameId;
+    container._hoverBaseY = animationBaseY; // Store base Y for reference
+  }
+
+  /**
+   * Stops the hover animation for a card container
+   * @param {Container} container - Card container to stop animating
+   */
+  static stopHoverAnimation(container) {
+    if (container._hoverAnimationId !== undefined) {
+      cancelAnimationFrame(container._hoverAnimationId);
+      container._hoverAnimationId = undefined;
+    }
   }
 }

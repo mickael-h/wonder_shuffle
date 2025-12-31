@@ -144,7 +144,6 @@ export class CardEffects {
       }
       case "mischief": {
         // Stacks: 1 item or 2 additional cards per card
-        const itemCount = count;
         const additionalCards = count * 2;
         const itemText = count === 1 ? "item" : "items";
         return {

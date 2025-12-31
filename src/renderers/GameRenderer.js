@@ -1,5 +1,9 @@
 import { Container, Graphics } from "pixi.js";
-import { CARD_CONFIG } from "../constants.js";
+import {
+  CARD_CONFIG,
+  ANIMATION_CONSTANTS,
+  LAYOUT_CONSTANTS,
+} from "../constants.js";
 import { CardAnimator } from "./CardAnimator.js";
 
 /**
@@ -14,9 +18,9 @@ export class GameRenderer {
     this.cardScale = 0.4;
     this.cardWidth = CARD_CONFIG.WIDTH * this.cardScale;
     this.cardHeight = CARD_CONFIG.HEIGHT * this.cardScale;
-    // Spacing between cards: proportional to card width (25% of card width for clear separation)
-    this.cardSpacing = this.cardWidth * 0.25;
-    this.cardsPerRow = 5;
+    // Spacing between cards: proportional to card width
+    this.cardSpacing = this.cardWidth * LAYOUT_CONSTANTS.CARD_SPACING_RATIO;
+    this.cardsPerRow = LAYOUT_CONSTANTS.CARDS_PER_ROW;
 
     // Scrolling setup
     this.scrollContainer = null;
@@ -31,6 +35,34 @@ export class GameRenderer {
     this.cursorX = 0;
     this.cursorY = 0;
     this.hoveredCard = null; // Currently hovered card container
+
+    // Track active render operations to prevent race conditions
+    this.activeRenderTimeouts = [];
+    this.activeResizeTimeout = null;
+
+    // Store bound event handlers for cleanup
+    this.boundHandlers = {
+      onDragStart: this.onDragStart.bind(this),
+      onDragMove: this.onDragMove.bind(this),
+      onDragEnd: this.onDragEnd.bind(this),
+      onTouchStart: this.onTouchStart.bind(this),
+      onTouchMove: this.onTouchMove.bind(this),
+      onTouchEnd: this.onTouchEnd.bind(this),
+      onResize: () => {
+        if (this.app && this.scrollContainer) {
+          this.updateMask();
+        }
+      },
+      onMouseMove: (event) => {
+        const rect = this.app.canvas.getBoundingClientRect();
+        this.cursorX = event.clientX - rect.left;
+        this.cursorY = event.clientY - rect.top;
+      },
+      onMouseLeave: () => {
+        this.cursorX = -1;
+        this.cursorY = -1;
+      },
+    };
 
     this.setupScrolling();
     this.setupCursorTracking();
@@ -52,29 +84,37 @@ export class GameRenderer {
     // Add mask to viewport
     this.updateMask();
 
-    // Mouse/touch event handlers for dragging
-    this.app.canvas.addEventListener("mousedown", this.onDragStart.bind(this));
-    this.app.canvas.addEventListener("mousemove", this.onDragMove.bind(this));
-    this.app.canvas.addEventListener("mouseup", this.onDragEnd.bind(this));
-    this.app.canvas.addEventListener("mouseleave", this.onDragEnd.bind(this));
+    // Mouse/touch event handlers for dragging (using bound handlers for cleanup)
+    this.app.canvas.addEventListener(
+      "mousedown",
+      this.boundHandlers.onDragStart
+    );
+    this.app.canvas.addEventListener(
+      "mousemove",
+      this.boundHandlers.onDragMove
+    );
+    this.app.canvas.addEventListener("mouseup", this.boundHandlers.onDragEnd);
+    this.app.canvas.addEventListener(
+      "mouseleave",
+      this.boundHandlers.onDragEnd
+    );
 
     // Touch events
     this.app.canvas.addEventListener(
       "touchstart",
-      this.onTouchStart.bind(this)
+      this.boundHandlers.onTouchStart
     );
-    this.app.canvas.addEventListener("touchmove", this.onTouchMove.bind(this));
-    this.app.canvas.addEventListener("touchend", this.onTouchEnd.bind(this));
+    this.app.canvas.addEventListener(
+      "touchmove",
+      this.boundHandlers.onTouchMove
+    );
+    this.app.canvas.addEventListener("touchend", this.boundHandlers.onTouchEnd);
 
     // Smooth scrolling with momentum
     this.app.ticker.add(this.updateScroll.bind(this));
 
     // Handle canvas resize to update mask
-    window.addEventListener("resize", () => {
-      if (this.app && this.scrollContainer) {
-        this.updateMask();
-      }
-    });
+    window.addEventListener("resize", this.boundHandlers.onResize);
   }
 
   /**
@@ -85,18 +125,17 @@ export class GameRenderer {
       return;
     }
 
-    // Track cursor position
-    this.app.canvas.addEventListener("mousemove", (event) => {
-      const rect = this.app.canvas.getBoundingClientRect();
-      this.cursorX = event.clientX - rect.left;
-      this.cursorY = event.clientY - rect.top;
-    });
+    // Track cursor position (using bound handlers for cleanup)
+    this.app.canvas.addEventListener(
+      "mousemove",
+      this.boundHandlers.onMouseMove
+    );
 
     // When cursor leaves, reset cursor position
-    this.app.canvas.addEventListener("mouseleave", () => {
-      this.cursorX = -1;
-      this.cursorY = -1;
-    });
+    this.app.canvas.addEventListener(
+      "mouseleave",
+      this.boundHandlers.onMouseLeave
+    );
 
     // Add card rotation update to ticker
     this.app.ticker.add(this.updateCardRotations.bind(this));
@@ -178,7 +217,22 @@ export class GameRenderer {
     if (newHoveredCard !== this.hoveredCard) {
       // Reset previously hovered card
       if (this.hoveredCard) {
+        // Stop hover animation before resetting (it will be restarted after reset)
+        CardAnimator.stopHoverAnimation(this.hoveredCard);
         this.resetCardToOriginal(this.hoveredCard);
+        // Restart hover animation when card is no longer hovered, using originalY as base
+        if (this.hoveredCard.originalY !== undefined) {
+          CardAnimator.startHoverAnimation(
+            this.hoveredCard,
+            this.hoveredCard.originalY
+          );
+        } else {
+          CardAnimator.startHoverAnimation(this.hoveredCard);
+        }
+      }
+      // Stop hover animation on newly hovered card (will be controlled by updateCardRotations)
+      if (newHoveredCard) {
+        CardAnimator.stopHoverAnimation(newHoveredCard);
       }
       this.hoveredCard = newHoveredCard;
     }
@@ -191,30 +245,23 @@ export class GameRenderer {
       const screenHeight = this.app.screen.height;
       const desiredCenterY = screenHeight / 2;
 
-      // Calculate safe target Y position accounting for full-sized card and hover animation
+      // Calculate safe target Y position accounting for full-sized card
       // At 100% scale, card height is CARD_CONFIG.HEIGHT (560px)
       // Card is positioned by its center, so:
       //   - Top edge = targetY - (cardHeight/2)
       //   - Bottom edge = targetY + (cardHeight/2)
-      // Hover animation can move card up/down by 5px (hoverIntensity)
-      // So actual bounds with hover:
-      //   - Top edge (worst case, moves up) = targetY - (cardHeight/2) - hoverIntensity
-      //   - Bottom edge (worst case, moves down) = targetY + (cardHeight/2) + hoverIntensity
-      // To prevent overflow:
-      //   - Top edge >= 0  =>  targetY >= (cardHeight/2) + hoverIntensity
-      //   - Bottom edge <= screenHeight  =>  targetY <= screenHeight - (cardHeight/2) - hoverIntensity
+      // Note: Hover animation is stopped for hovered cards, so no need to account for it
       const cardFullHeight = CARD_CONFIG.HEIGHT; // 560px
-      const hoverIntensity = 5; // pixels
       const halfCardHeight = cardFullHeight / 2; // 280px
 
-      // Calculate bounds: targetY must ensure card + hover animation doesn't overflow
-      // Top constraint: targetY - halfCardHeight - hoverIntensity >= 0
-      // => targetY >= halfCardHeight + hoverIntensity = 280 + 5 = 285
-      const minY = halfCardHeight + hoverIntensity;
+      // Calculate bounds: targetY must ensure card doesn't overflow
+      // Top constraint: targetY - halfCardHeight >= 0
+      // => targetY >= halfCardHeight
+      const minY = halfCardHeight;
 
-      // Bottom constraint: targetY + halfCardHeight + hoverIntensity <= screenHeight
-      // => targetY <= screenHeight - halfCardHeight - hoverIntensity
-      const maxY = screenHeight - halfCardHeight - hoverIntensity;
+      // Bottom constraint: targetY + halfCardHeight <= screenHeight
+      // => targetY <= screenHeight - halfCardHeight
+      const maxY = screenHeight - halfCardHeight;
 
       // Clamp target Y to safe bounds (ensure it's within [minY, maxY])
       const targetY = Math.max(minY, Math.min(maxY, desiredCenterY));
@@ -223,11 +270,11 @@ export class GameRenderer {
       const currentX = this.hoveredCard.x;
       const currentY = this.hoveredCard.y;
       const targetX = centerX;
-      const easeFactor = 0.1; // Half speed (was 0.2)
+      const easeFactor = ANIMATION_CONSTANTS.EASE_FACTOR_HOVER;
       this.hoveredCard.x = currentX + (targetX - currentX) * easeFactor;
       this.hoveredCard.y = currentY + (targetY - currentY) * easeFactor;
 
-      // Scale to 100% (also twice as slow)
+      // Scale to 100%
       const targetScale = 1.0;
       const currentScaleX = this.hoveredCard.scale.x;
       const currentScaleY = this.hoveredCard.scale.y;
@@ -237,7 +284,7 @@ export class GameRenderer {
       this.hoveredCard.scale.y = currentScaleY + scaleYDelta * easeFactor;
 
       // Bring to front
-      this.hoveredCard.zIndex = 1000;
+      this.hoveredCard.zIndex = ANIMATION_CONSTANTS.HOVERED_CARD_ZINDEX;
     }
 
     // Handle non-hovered cards: reset to original position and apply proximity scaling
@@ -262,7 +309,7 @@ export class GameRenderer {
       const distance = Math.sqrt(dx * dx + dy * dy);
 
       // Maximum distance for full effect
-      const maxDistance = 300;
+      const maxDistance = ANIMATION_CONSTANTS.MAX_PROXIMITY_DISTANCE;
       const proximityFactor = Math.max(
         0,
         Math.min(1, 1 - distance / maxDistance)
@@ -270,8 +317,7 @@ export class GameRenderer {
 
       // Calculate target scale based on horizontal position (simulating Y-axis rotation)
       // Closer cursor = larger scale (reverse effect)
-      // Less intense effect (scale increase of 10%)
-      const maxScaleIncrease = 0.1; // 10% increase at maximum
+      const maxScaleIncrease = ANIMATION_CONSTANTS.MAX_SCALE_INCREASE;
       const baseScaleX = cardContainer.baseScaleX;
       const baseScaleY = cardContainer.baseScaleY;
       const normalizedDx = distance > 0 ? dx / distance : 0;
@@ -287,7 +333,7 @@ export class GameRenderer {
       const currentScaleY = cardContainer.scale.y;
       const scaleXDelta = targetScaleX - currentScaleX;
       const scaleYDelta = targetScaleY - currentScaleY;
-      const easeFactor = 0.15; // Ease out factor (lower = smoother)
+      const easeFactor = ANIMATION_CONSTANTS.EASE_FACTOR_PROXIMITY;
       cardContainer.scale.x = currentScaleX + scaleXDelta * easeFactor;
       cardContainer.scale.y = currentScaleY + scaleYDelta * easeFactor;
 
@@ -308,7 +354,7 @@ export class GameRenderer {
       return;
     }
 
-    const easeFactor = 0.2;
+    const easeFactor = ANIMATION_CONSTANTS.EASE_FACTOR_RESET;
     const currentX = cardContainer.x;
     const currentY = cardContainer.y;
     const targetX = cardContainer.originalX;
@@ -495,15 +541,15 @@ export class GameRenderer {
 
     // Calculate required height for the canvas based on number of cards
     const rows = Math.ceil(cardNames.length / this.cardsPerRow);
-    const rowHeight = this.cardHeight + this.cardSpacing;
-    let totalHeight = rows * (this.cardHeight + this.cardSpacing) + 60; // 60px padding (30px top, 30px bottom)
+    let totalHeight =
+      rows * (this.cardHeight + this.cardSpacing) +
+      ANIMATION_CONSTANTS.CANVAS_PADDING;
 
     // For draws of less than 5 cards, ensure game area is at least full card height
-    // Account for hover animation (5px) on both top and bottom
     // This prevents overflow when cards are hovered and scaled to 100%
     if (cardNames.length < 5) {
-      const hoverIntensity = 5;
-      const minHeight = CARD_CONFIG.HEIGHT + hoverIntensity * 2 + 40; // Full card height + hover space + padding
+      const minHeight =
+        CARD_CONFIG.HEIGHT + ANIMATION_CONSTANTS.CANVAS_PADDING_MIN;
       totalHeight = Math.max(totalHeight, minHeight);
     }
 
@@ -512,7 +558,13 @@ export class GameRenderer {
     if (container) {
       container.style.height = `${totalHeight}px`;
       // Wait for layout update before resizing PixiJS and rendering cards
-      setTimeout(() => {
+      // Cancel any previous resize timeout to prevent race conditions
+      if (this.activeResizeTimeout !== null) {
+        clearTimeout(this.activeResizeTimeout);
+      }
+
+      this.activeResizeTimeout = setTimeout(() => {
+        this.activeResizeTimeout = null;
         const containerRect = container.getBoundingClientRect();
         if (containerRect.height > 0 && containerRect.width > 0) {
           this.app.renderer.resize(containerRect.width, containerRect.height);
@@ -538,11 +590,18 @@ export class GameRenderer {
           }
 
           // Create and animate cards sequentially with delays
+          // Track timeouts so they can be cancelled if needed
           for (let i = 0; i < cardNames.length; i++) {
             const cardName = cardNames[i];
-            const delay = i * 150; // Stagger animations (150ms between cards)
+            const delay = i * ANIMATION_CONSTANTS.CARD_ANIMATION_DELAY;
 
-            setTimeout(async () => {
+            const timeoutId = setTimeout(async () => {
+              // Remove from active timeouts when executed
+              const index = this.activeRenderTimeouts.indexOf(timeoutId);
+              if (index > -1) {
+                this.activeRenderTimeouts.splice(index, 1);
+              }
+
               const frontSprite = await this.cardRenderer.createCardSprite(
                 cardName,
                 false
@@ -584,6 +643,8 @@ export class GameRenderer {
                 this.autoPanToCard(i, positions, totalWidth);
               }
             }, delay);
+
+            this.activeRenderTimeouts.push(timeoutId);
           }
         }
       }, 0);
@@ -594,11 +655,34 @@ export class GameRenderer {
    * Clears all rendered cards from the canvas
    */
   clearCards() {
+    // Cancel any pending render timeouts to prevent race conditions
+    this.cancelActiveRenderTimeouts();
+
+    // Stop all hover animations before removing cards
+    this.cardSprites.forEach((cardContainer) => {
+      CardAnimator.stopHoverAnimation(cardContainer);
+    });
+
     if (this.scrollContainer) {
       this.scrollContainer.removeChildren();
     }
     this.cardSprites = [];
     this.hoveredCard = null; // Reset hovered card
+  }
+
+  /**
+   * Cancels all active render timeouts to prevent race conditions
+   */
+  cancelActiveRenderTimeouts() {
+    this.activeRenderTimeouts.forEach((timeoutId) => {
+      clearTimeout(timeoutId);
+    });
+    this.activeRenderTimeouts = [];
+
+    if (this.activeResizeTimeout !== null) {
+      clearTimeout(this.activeResizeTimeout);
+      this.activeResizeTimeout = null;
+    }
   }
 
   /**
@@ -670,7 +754,7 @@ export class GameRenderer {
 
     const startX = this.scrollContainer.x;
     const distance = targetX - startX;
-    const duration = 300; // milliseconds
+    const duration = ANIMATION_CONSTANTS.SMOOTH_SCROLL_DURATION;
     const startTime = Date.now();
 
     const animate = () => {
