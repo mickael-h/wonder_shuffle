@@ -1,4 +1,4 @@
-import { Sprite, Container, Assets } from "pixi.js";
+import { Sprite, Container, Assets, SCALE_MODES } from "pixi.js";
 import { CARD_CONFIG } from "../constants.js";
 
 /**
@@ -9,6 +9,70 @@ export class CardRenderer {
     this.cardWidth = CARD_CONFIG.WIDTH;
     this.cardHeight = CARD_CONFIG.HEIGHT;
     this.textureCache = new Map();
+    this.backsideTexture = null;
+  }
+
+  /**
+   * Loads the backside texture
+   * @returns {Promise<Texture|null>} Backside texture
+   */
+  async loadBacksideTexture() {
+    if (this.backsideTexture) {
+      return this.backsideTexture;
+    }
+
+    try {
+      const texture = await Assets.load("/assets/images/backside.png");
+      
+      // Enable linear filtering for smooth scaling (better anti-aliasing)
+      texture.baseTexture.scaleMode = SCALE_MODES.LINEAR;
+      
+      this.backsideTexture = texture;
+      return texture;
+    } catch (error) {
+      console.error("Failed to load backside texture:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Creates a card sprite (either front or back)
+   * @param {string|Texture} cardNameOrTexture - Card name or texture
+   * @param {boolean} isBackside - Whether to create backside sprite
+   * @returns {Promise<Sprite|null>} Card sprite
+   */
+  async createCardSprite(cardNameOrTexture, isBackside = false) {
+    try {
+      let texture;
+      if (isBackside) {
+        texture = await this.loadBacksideTexture();
+      } else if (typeof cardNameOrTexture === "string") {
+        texture = await this.loadCardTexture(cardNameOrTexture);
+      } else {
+        texture = cardNameOrTexture;
+      }
+
+      if (!texture) {
+        return null;
+      }
+
+      const sprite = new Sprite(texture);
+
+      // Center anchor point for rotation (set before scaling)
+      sprite.anchor.set(0.5, 0.5);
+
+      // Scale sprite to fit card dimensions while maintaining aspect ratio
+      const scale = Math.min(
+        this.cardWidth / sprite.width,
+        this.cardHeight / sprite.height
+      );
+      sprite.scale.set(scale);
+
+      return sprite;
+    } catch (error) {
+      console.error("Error creating card sprite:", error);
+      return null;
+    }
   }
 
   /**
@@ -69,10 +133,13 @@ export class CardRenderer {
     try {
       const imagePath = `/assets/images/${cardName}.png`;
       const texture = await Assets.load(imagePath);
-      
+
+      // Enable linear filtering for smooth scaling (better anti-aliasing)
+      texture.baseTexture.scaleMode = SCALE_MODES.LINEAR;
+
       // Cache the texture for future use
       this.textureCache.set(cardName, texture);
-      
+
       return texture;
     } catch (error) {
       console.error(`Failed to load texture for card: ${cardName}`, error);
@@ -81,13 +148,14 @@ export class CardRenderer {
   }
 
   /**
-   * Preloads all card textures
+   * Preloads all card textures including backside
    * @returns {Promise<void>}
    */
   async preloadAllTextures(cardNames) {
-    const loadPromises = cardNames.map((cardName) =>
-      this.loadCardTexture(cardName)
-    );
+    const loadPromises = [
+      this.loadBacksideTexture(),
+      ...cardNames.map((cardName) => this.loadCardTexture(cardName)),
+    ];
     await Promise.all(loadPromises);
   }
 }
