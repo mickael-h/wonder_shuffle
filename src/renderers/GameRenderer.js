@@ -237,39 +237,42 @@ export class GameRenderer {
       this.hoveredCard = newHoveredCard;
     }
 
-    // Handle hovered card: move to center and scale to 100%
+    // Handle hovered card: move slightly toward center to prevent overflow and scale to 100%
     if (this.hoveredCard) {
-      const centerX = this.app.screen.width / 2;
-
       // Get actual screen height (should match container height)
       const screenHeight = this.app.screen.height;
-      const desiredCenterY = screenHeight / 2;
-
-      // Calculate safe target Y position accounting for full-sized card
-      // At 100% scale, card height is CARD_CONFIG.HEIGHT (560px)
-      // Card is positioned by its center, so:
-      //   - Top edge = targetY - (cardHeight/2)
-      //   - Bottom edge = targetY + (cardHeight/2)
-      // Note: Hover animation is stopped for hovered cards, so no need to account for it
-      const cardFullHeight = CARD_CONFIG.HEIGHT; // 560px
+      const cardFullHeight = CARD_CONFIG.HEIGHT; // 560px at 100% scale
       const halfCardHeight = cardFullHeight / 2; // 280px
 
-      // Calculate bounds: targetY must ensure card doesn't overflow
-      // Top constraint: targetY - halfCardHeight >= 0
-      // => targetY >= halfCardHeight
-      const minY = halfCardHeight;
+      // Get card's original position
+      const originalX = this.hoveredCard.originalX;
+      const originalY = this.hoveredCard.originalY;
 
-      // Bottom constraint: targetY + halfCardHeight <= screenHeight
-      // => targetY <= screenHeight - halfCardHeight
+      // Calculate safe bounds: targetY must ensure card doesn't overflow
+      // Top constraint: targetY - halfCardHeight >= 0 => targetY >= halfCardHeight
+      const minY = halfCardHeight;
+      // Bottom constraint: targetY + halfCardHeight <= screenHeight => targetY <= screenHeight - halfCardHeight
       const maxY = screenHeight - halfCardHeight;
 
-      // Clamp target Y to safe bounds (ensure it's within [minY, maxY])
-      const targetY = Math.max(minY, Math.min(maxY, desiredCenterY));
+      // Only adjust Y position if the card would overflow at original position
+      // Move toward center just enough to fit, but don't move all the way to center
+      let targetY = originalY;
+      if (originalY < minY) {
+        // Card too high, move down just enough to fit
+        targetY = minY;
+      } else if (originalY > maxY) {
+        // Card too low, move up just enough to fit
+        targetY = maxY;
+      }
 
-      // Smoothly move to center (both horizontally and vertically)
+      // X position: move slightly toward center but not all the way
+      const centerX = this.app.screen.width / 2;
       const currentX = this.hoveredCard.x;
+      // Move 30% toward center (subtle adjustment)
+      const targetX = originalX + (centerX - originalX) * 0.3;
+
+      // Smoothly move to adjusted position
       const currentY = this.hoveredCard.y;
-      const targetX = centerX;
       const easeFactor = ANIMATION_CONSTANTS.EASE_FACTOR_HOVER;
       this.hoveredCard.x = currentX + (targetX - currentX) * easeFactor;
       this.hoveredCard.y = currentY + (targetY - currentY) * easeFactor;
@@ -545,13 +548,11 @@ export class GameRenderer {
       rows * (this.cardHeight + this.cardSpacing) +
       ANIMATION_CONSTANTS.CANVAS_PADDING;
 
-    // For draws of less than 5 cards, ensure game area is at least full card height
+    // Ensure game area is at least full card height (for 1 row or when cards are hovered at 100% scale)
     // This prevents overflow when cards are hovered and scaled to 100%
-    if (cardNames.length < 5) {
-      const minHeight =
-        CARD_CONFIG.HEIGHT + ANIMATION_CONSTANTS.CANVAS_PADDING_MIN;
-      totalHeight = Math.max(totalHeight, minHeight);
-    }
+    const minHeight =
+      CARD_CONFIG.HEIGHT + ANIMATION_CONSTANTS.CANVAS_PADDING_MIN;
+    totalHeight = Math.max(totalHeight, minHeight);
 
     // Update canvas container and app height to fit all cards
     const container = document.getElementById("canvas-container");
