@@ -137,7 +137,10 @@ export class CardEffects {
             ? "item or piece of equipment"
             : "items or pieces of equipment";
         const numberText = count === 1 ? "One" : count;
-        return `${numberText} nonmagical ${itemText} in your possession (chosen by the DM) ${count === 1 ? "disappears" : "disappear"}. The ${count === 1 ? "item" : "items"} remain nearby but concealed for a short time, so ${count === 1 ? "it can" : "they can"} be found with a successful DC 15 Wisdom (Perception) check. If the ${count === 1 ? "item isn't" : "items aren't"} recovered within 1 hour, ${count === 1 ? "it disappears" : "they disappear"} forever.`;
+        return {
+          text: `${numberText} nonmagical ${itemText} in your possession (chosen by the DM) ${count === 1 ? "disappears" : "disappear"}. The ${count === 1 ? "item" : "items"} remain nearby but concealed for a short time, so ${count === 1 ? "it can" : "they can"} be found with a successful DC 15 Wisdom (Perception) check. If the ${count === 1 ? "item isn't" : "items aren't"} recovered within 1 hour, ${count === 1 ? "it disappears" : "they disappear"} forever.`,
+          isCurse: true,
+        };
       }
       case "mischief": {
         // Stacks: 1 item or 2 additional cards per card
