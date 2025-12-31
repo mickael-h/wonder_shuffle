@@ -1,0 +1,35 @@
+{
+  "name": "wonder-shuffle",
+  "version": "1.0.0",
+  "description": "A card drawing game built with PixiJS",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "format": "prettier --write \"src/**/*.{js,json}\"",
+    "format:check": "prettier --check \"src/**/*.{js,json}\"",
+    "lint": "eslint src/**/*.js",
+    "lint:fix": "eslint src/**/*.js --fix",
+    "check": "npm run format:check && npm run lint"
+  },
+  "keywords": [
+    "pixijs",
+    "game",
+    "cards"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@dice-roller/rpg-dice-roller": "^5.5.1",
+    "pixi.js": "^8.14.3",
+    "pure-rand": "^7.0.1"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.29.1",
+    "prettier": "^3.2.5",
+    "vite": "^5.0.0"
+  }
+}
