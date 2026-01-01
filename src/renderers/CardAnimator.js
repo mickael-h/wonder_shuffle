@@ -193,18 +193,49 @@ export class CardAnimator {
       const currentScale = targetScale * scaleEaseOut;
       container.scale.set(currentScale);
 
-      // Vertical flip effect (scale X to 0 then back to 1)
-      const flipProgress = progress;
-      if (flipProgress < 0.5) {
-        // First half: show backside, scale X down
+      // Vertical flip effect - spin twice (back -> front -> back -> front)
+      // Map progress (0-1) to 2 full cycles (0-4)
+      const cycleProgress = progress * 4;
+      const cycleIndex = Math.floor(cycleProgress);
+      const cyclePosition = cycleProgress - cycleIndex;
+
+      // Each cycle: 0->1 = collapse, 1->2 = expand
+      // Cycle 0: back collapses
+      // Cycle 1: front expands, then collapses
+      // Cycle 2: back expands, then collapses
+      // Cycle 3: front expands (final)
+      if (cycleIndex === 0) {
+        // First cycle: back collapses
         backContainer.visible = true;
         frontContainer.visible = false;
-        backContainer.scale.x = 1 - flipProgress * 2;
+        backContainer.scale.x = 1 - cyclePosition;
+      } else if (cycleIndex === 1) {
+        // Second cycle: front expands, then collapses
+        if (cyclePosition < 0.5) {
+          backContainer.visible = false;
+          frontContainer.visible = true;
+          frontContainer.scale.x = cyclePosition * 2;
+        } else {
+          frontContainer.visible = true;
+          backContainer.visible = false;
+          frontContainer.scale.x = 1 - (cyclePosition - 0.5) * 2;
+        }
+      } else if (cycleIndex === 2) {
+        // Third cycle: back expands, then collapses
+        if (cyclePosition < 0.5) {
+          backContainer.visible = true;
+          frontContainer.visible = false;
+          backContainer.scale.x = cyclePosition * 2;
+        } else {
+          backContainer.visible = true;
+          frontContainer.visible = false;
+          backContainer.scale.x = 1 - (cyclePosition - 0.5) * 2;
+        }
       } else {
-        // Second half: show front, scale X up
+        // Fourth cycle: front expands (final)
         backContainer.visible = false;
         frontContainer.visible = true;
-        frontContainer.scale.x = (flipProgress - 0.5) * 2;
+        frontContainer.scale.x = cyclePosition;
       }
 
       // Animate glitter particles with pulsing and rotation
