@@ -37,7 +37,7 @@ class CardGame {
 
       this.uiManager.setup(
         (count) => this.handleDrawCardsAsync(count),
-        (size) => this.handleDeckSizeChange(size)
+        (size, selectedCards) => this.handleDeckSizeChange(size, selectedCards)
       );
     } catch (error) {
       console.error("Failed to initialize game:", error);
@@ -59,10 +59,6 @@ class CardGame {
     }
 
     if (this.deckManager.isEmpty()) {
-      return;
-    }
-
-    if (count > this.deckManager.getDeckSize()) {
       return;
     }
 
@@ -107,10 +103,11 @@ class CardGame {
 
   /**
    * Handles deck size change
-   * @param {number} size - New deck size (13 or 22)
+   * @param {number|string} size - New deck size (13, 22) or DECK_SIZES.CUSTOM
+   * @param {string[]} [selectedCards] - Selected card names for custom deck (when size is CUSTOM)
    */
-  async handleDeckSizeChange(size) {
-    this.deckManager.createDeck(size);
+  async handleDeckSizeChange(size, selectedCards = null) {
+    this.deckManager.createDeck(size, selectedCards);
     this.drawnCards = [];
     this.effectsRenderer.clearSelections();
     await this.gameRenderer.renderCards([]);

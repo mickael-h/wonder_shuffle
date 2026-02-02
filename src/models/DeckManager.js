@@ -13,16 +13,23 @@ export class DeckManager {
 
   /**
    * Creates a tarot card deck from available card images
-   * @param {number} size - Deck size (13 or 22)
+   * @param {number|string} size - Deck size (13, 22) or DECK_SIZES.CUSTOM
+   * @param {string[]} [customCards] - Array of card names for custom deck (required when size is CUSTOM)
    */
-  createDeck(size = null) {
-    const targetSize = size || this.deckSize;
-    const cardSet =
-      targetSize === DECK_SIZES.REDUCED
-        ? TAROT_CARDS.REDUCED
-        : TAROT_CARDS.FULL;
+  createDeck(size = null, customCards = null) {
+    let cardSet;
+    if (size === DECK_SIZES.CUSTOM) {
+      cardSet = customCards && customCards.length > 0 ? [...customCards] : [];
+      this.deckSize = cardSet.length;
+    } else {
+      const targetSize = size ?? this.deckSize;
+      cardSet =
+        targetSize === DECK_SIZES.REDUCED
+          ? TAROT_CARDS.REDUCED
+          : TAROT_CARDS.FULL;
+      this.deckSize = typeof targetSize === "number" ? targetSize : cardSet.length;
+    }
     this.deck = [...cardSet];
-    this.deckSize = targetSize;
     this.shuffleDeck();
   }
 
@@ -43,10 +50,10 @@ export class DeckManager {
    * @returns {Array} Array of drawn cards (randomly selected)
    */
   drawCards(count) {
-    if (count > this.deck.length) {
+    if (this.deck.length === 0) {
       return null;
     }
-    // Randomly select cards without removing them from the deck
+    // Randomly select cards without removing them from the deck (cards are reinserted after each draw)
     const drawn = [];
     for (let i = 0; i < count; i++) {
       const randomIndex = randomInt(0, this.deck.length - 1);

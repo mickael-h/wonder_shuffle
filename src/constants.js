@@ -58,6 +58,7 @@ export const TAROT_CARDS = {
 export const DECK_SIZES = {
   FULL: 22,
   REDUCED: 13,
+  CUSTOM: "custom",
 };
 
 export const DECK_CONFIG = {

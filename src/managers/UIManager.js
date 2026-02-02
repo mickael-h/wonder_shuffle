@@ -1,4 +1,4 @@
-import { DECK_SIZES, DECK_CONFIG } from "../constants.js";
+import { DECK_SIZES, DECK_CONFIG, TAROT_CARDS } from "../constants.js";
 
 /**
  * Manages UI interactions
@@ -8,15 +8,17 @@ export class UIManager {
     this.drawButton = null;
     this.cardCountInput = null;
     this.deckSizeRadios = null;
+    this.customDeckSection = null;
+    this.customDeckCardsContainer = null;
     this.onDrawCardsCallback = null;
     this.onDeckSizeChangeCallback = null;
-    this.currentMaxDraw = DECK_SIZES.FULL;
+    this.isCustomMode = false;
   }
 
   /**
    * Initializes UI elements and event listeners
    * @param {Function} onDrawCards - Callback for draw button click
-   * @param {Function} onDeckSizeChange - Callback for deck size change
+   * @param {Function} onDeckSizeChange - Callback for deck size change (size, selectedCards)
    */
   setup(onDrawCards, onDeckSizeChange) {
     this.onDrawCardsCallback = onDrawCards;
@@ -25,21 +27,82 @@ export class UIManager {
     this.drawButton = document.getElementById("draw-button");
     this.cardCountInput = document.getElementById("card-count");
     this.deckSizeRadios = document.querySelectorAll('input[name="deck-size"]');
+    this.customDeckSection = document.getElementById("custom-deck-section");
+    this.customDeckCardsContainer = document.getElementById("custom-deck-cards");
 
     if (!this.drawButton || !this.cardCountInput || this.deckSizeRadios.length === 0) {
       console.error("Required UI elements not found");
       return false;
     }
 
+    this.buildCustomDeckCheckboxes();
+
     // Set initial max draw based on checked radio
     const checkedRadio = document.querySelector('input[name="deck-size"]:checked');
     if (checkedRadio) {
-      this.currentMaxDraw = parseInt(checkedRadio.value, 10);
+      this.handleDeckSizeRadioChange(checkedRadio);
     }
 
     this.attachEventListeners();
     this.updateMaxDrawLimit();
     return true;
+  }
+
+  /**
+   * Builds checkbox list for custom deck card selection
+   */
+  buildCustomDeckCheckboxes() {
+    if (!this.customDeckCardsContainer) return;
+
+    this.customDeckCardsContainer.innerHTML = "";
+    for (const cardName of TAROT_CARDS.FULL) {
+      const label = document.createElement("label");
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.name = "custom-deck-card";
+      checkbox.value = cardName;
+      checkbox.checked = true;
+      const span = document.createElement("span");
+      span.textContent = cardName.charAt(0).toUpperCase() + cardName.slice(1);
+      label.appendChild(checkbox);
+      label.appendChild(span);
+      this.customDeckCardsContainer.appendChild(label);
+    }
+  }
+
+  /**
+   * Handles deck size radio change
+   * @param {HTMLInputElement} radio - The checked radio element
+   */
+  handleDeckSizeRadioChange(radio) {
+    const value = radio.value;
+    if (value === DECK_SIZES.CUSTOM) {
+      this.isCustomMode = true;
+      this.customDeckSection?.classList.add("visible");
+      this.customDeckSection?.setAttribute("aria-hidden", "false");
+      if (this.onDeckSizeChangeCallback) {
+        this.onDeckSizeChangeCallback(DECK_SIZES.CUSTOM, this.getSelectedCustomCards());
+      }
+    } else {
+      this.isCustomMode = false;
+      this.customDeckSection?.classList.remove("visible");
+      this.customDeckSection?.setAttribute("aria-hidden", "true");
+      if (this.onDeckSizeChangeCallback) {
+        this.onDeckSizeChangeCallback(parseInt(value, 10), null);
+      }
+    }
+  }
+
+  /**
+   * Gets the list of selected card names for custom deck
+   * @returns {string[]} Array of selected card names
+   */
+  getSelectedCustomCards() {
+    if (!this.customDeckCardsContainer) return [];
+    const checkboxes = this.customDeckCardsContainer.querySelectorAll(
+      'input[name="custom-deck-card"]:checked'
+    );
+    return Array.from(checkboxes).map((cb) => cb.value);
   }
 
   /**
@@ -59,26 +122,27 @@ export class UIManager {
     this.deckSizeRadios.forEach((radio) => {
       radio.addEventListener("change", (event) => {
         if (event.target.checked) {
-          const newSize = parseInt(event.target.value, 10);
-          this.currentMaxDraw = newSize;
+          this.handleDeckSizeRadioChange(event.target);
           this.updateMaxDrawLimit();
-          if (this.onDeckSizeChangeCallback) {
-            this.onDeckSizeChangeCallback(newSize);
-          }
         }
       });
+    });
+
+    // Listen for custom deck checkbox changes
+    this.customDeckCardsContainer?.addEventListener("change", () => {
+      if (this.isCustomMode && this.onDeckSizeChangeCallback) {
+        this.onDeckSizeChangeCallback(DECK_SIZES.CUSTOM, this.getSelectedCustomCards());
+      }
     });
   }
 
   /**
-   * Updates the max attribute of the card count input based on current deck size
-   * The max draw is limited to DECK_CONFIG.MAX_DRAW (20) regardless of deck size
+   * Updates the max attribute of the card count input
    */
   updateMaxDrawLimit() {
-    const maxDraw = Math.min(this.currentMaxDraw, DECK_CONFIG.MAX_DRAW);
-    this.cardCountInput.max = maxDraw;
-    if (parseInt(this.cardCountInput.value, 10) > maxDraw) {
-      this.cardCountInput.value = maxDraw;
+    this.cardCountInput.max = DECK_CONFIG.MAX_DRAW;
+    if (parseInt(this.cardCountInput.value, 10) > DECK_CONFIG.MAX_DRAW) {
+      this.cardCountInput.value = DECK_CONFIG.MAX_DRAW;
     }
   }
 
@@ -88,8 +152,6 @@ export class UIManager {
    * @returns {boolean} True if count is valid
    */
   isValidCardCount(count) {
-    const maxDraw = Math.min(this.currentMaxDraw, DECK_CONFIG.MAX_DRAW);
-    return !Number.isNaN(count) && count > 0 && count <= maxDraw;
+    return !Number.isNaN(count) && count > 0 && count <= DECK_CONFIG.MAX_DRAW;
   }
 }
-

@@ -241,6 +241,13 @@ src/
 - Ensures consistent, testable randomness
 - Better statistical distribution
 
+### 5. Draw Limit Independent of Deck Size
+
+- **Cards are reinserted after each draw** (drawing is sampling with replacement).
+- The maximum number of cards that can be drawn is **always** `DECK_CONFIG.MAX_DRAW` (20).
+- Deck size (13, 22, or custom) **must never** limit the draw count input.
+- This is a fixed design decision; do not revert or suggest changes that tie draw limits to deck size.
+
 ## Benefits
 
 - **Maintainability**: Changes to one module don't affect others

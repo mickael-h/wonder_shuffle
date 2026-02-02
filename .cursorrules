@@ -1,0 +1,11 @@
+# Wonder Shuffle Project Rules
+
+## Deck and Draw Limits (DO NOT VIOLATE)
+
+**The deck size MUST NOT affect the maximum number of cards that can be drawn.**
+
+- Cards are reinserted into the deck after each draw (drawing is sampling with replacement).
+- The max number of drawn cards is always `DECK_CONFIG.MAX_DRAW` (20), regardless of deck size.
+- NEVER cap the "number of cards to draw" input based on deck size (13, 22, or custom).
+- NEVER suggest, implement, or revert to logic that limits draws by deck size.
+- The 13-card deck, 22-card deck, and custom deck all allow drawing up to 20 cards.

@@ -34,6 +34,15 @@
             <input type="radio" name="deck-size" value="13" />
             <span>13 cards</span>
           </label>
+          <label>
+            <input type="radio" name="deck-size" value="custom" />
+            <span>Custom</span>
+          </label>
+        </div>
+        <div id="custom-deck-section" class="custom-deck-section" aria-hidden="true">
+          <p class="custom-deck-prompt">Select "Custom" above to choose which cards appear in your deck.</p>
+          <p class="custom-deck-label">Select cards for your deck:</p>
+          <div id="custom-deck-cards" class="custom-deck-cards"></div>
         </div>
         <button id="draw-button">Draw Cards</button>
       </div>
